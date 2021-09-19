@@ -1,0 +1,1 @@
+{"name":"cribl-cef-pack","version":"0.1.0","author":"Brendan Dalpe - Cribl","description":"Handles parsing of CEF messages into Key=Value or JSON format.","displayName":"Common Event Format (CEF)"}

@@ -1,0 +1,238 @@
+output: default
+groups:
+  BVYPDJ:
+    name: Field Extractions
+    index: 1
+  T6wAeu:
+    name: Rename custom fields with Label names
+    index: 2
+    disabled: false
+  7Q0BRw:
+    name: Re-serialize as K=V Pairs (No CEF header)
+    index: 4
+    disabled: true
+  HT47c1:
+    name: Re-serialize as JSON
+    disabled: true
+    index: 5
+  ttuoWH:
+    name: Re-serialize as "CEF"
+    disabled: true
+    index: 6
+    description: Uses same format as CEF, but with K=V pairs
+asyncFuncTimeout: 1000
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Common Event Format (CEF) reshaping pipeline
+  - id: regex_extract
+    filter: "true"
+    disabled: false
+    conf:
+      source: _raw
+      iterations: 100
+      overwrite: false
+      regex: /(?<__header>CEF:(?<cef_version>\d+)\|(?<cef_device_vendor>.*?)(?<!\\)\|(?<cef_device_product>.*?)(?<!\\)\|(?<cef_device_version>.*?)(?<!\\)\|(?<cef_signature_id>.*?)(?<!\\)\|(?<cef_name>.*?)(?<!\\)\|(?<cef_severity>.*?))(?<!\\)\|(?<__message>.+)/
+    description: Extract CEF header values
+    groupId: BVYPDJ
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Cleanup fields per spec 📖
+    groupId: BVYPDJ
+  - id: mask
+    filter: "true"
+    disabled: null
+    conf:
+      rules:
+        - matchRegex: /\\\|/
+          replaceExpr: "'|'"
+      fields:
+        - cef_*
+    groupId: BVYPDJ
+    description: Unescape vertical pipes after they have been extracted.
+  - id: mask
+    filter: "true"
+    disabled: null
+    conf:
+      rules:
+        - matchRegex: /\\n/
+          replaceExpr: "'\\n'"
+        - matchRegex: /\\r/
+          replaceExpr: "'\\r'"
+        - matchRegex: /\\=/
+          replaceExpr: "'='"
+        - matchRegex: /\\\\/
+          replaceExpr: "'\\\\'"
+      fields:
+        - __message
+    groupId: BVYPDJ
+    description: Unescape characters in the message
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: K=V field extraction happens here 👇
+    groupId: BVYPDJ
+  - id: regex_extract
+    filter: "true"
+    disabled: false
+    conf:
+      source: __message
+      iterations: 100
+      overwrite: false
+      regex: /(?<_NAME_0>[^ =]+)=(?<_VALUE_0>.*?(?=\s\w+=|$))/gs
+    description: Extract K=V pairs from CEF message
+    groupId: BVYPDJ
+  - id: comment
+    filter: "true"
+    disabled: false
+    conf:
+      comment: >-
+        If you do not want to map the custom field labels to the field name,
+        disable the code function below.
+
+
+        The following function turns this:
+
+        cs4=103.6.32.100 cs4Label=clientIPAddress
+
+
+        into this:
+
+        clientIPAddress=103.6.32.100
+    groupId: T6wAeu
+  - id: code
+    filter: "true"
+    disabled: false
+    conf:
+      maxNumOfIterations: 5000
+      code: >-
+        Object.keys(__e).filter(key => /^c[snf]\d+$/.test(key)).forEach(value =>
+        {
+            // Check if event has matching label field
+            if (__e.hasOwnProperty(`${value}Label`)) {
+                // Deep copy to new field
+                Object.assign(__e, {[__e[`${value}Label`]]: __e[value]});
+                // Remove original fields from the event
+                // Any spaces in labels will be replaced with underscores
+                __e[`${value}`] = undefined;
+                __e[`${value}Label`] = undefined;
+            }
+        })
+    description: Convert custom fields and label values into K=V pairs
+    groupId: T6wAeu
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Enable one of the following re-serialization methods to rewrite the _raw
+        field with the extracted fields.
+  - id: serialize
+    filter: "true"
+    disabled: true
+    conf:
+      type: kvp
+      fields:
+        - "!__*"
+        - "!_*"
+        - "!cribl*"
+        - "!cef_*"
+        - "!index"
+        - "!host"
+        - "!source"
+        - "!sourcetype"
+        - "!message"
+        - "!severity*"
+        - "!facility*"
+        - "!appname"
+        - "*"
+      dstField: _raw
+      cleanFields: true
+    groupId: 7Q0BRw
+  - id: serialize
+    filter: "true"
+    disabled: true
+    conf:
+      type: json
+      dstField: _raw
+      fields:
+        - "!__*"
+        - "!_*"
+        - "!cribl*"
+        - "!cef_*"
+        - "!index"
+        - "!host"
+        - "!source"
+        - "!sourcetype"
+        - "!message"
+        - "!severity*"
+        - "!facility*"
+        - "!appname"
+        - "*"
+      cleanFields: false
+    groupId: HT47c1
+  - id: serialize
+    filter: "true"
+    disabled: true
+    conf:
+      type: kvp
+      fields:
+        - "!__*"
+        - "!_*"
+        - "!cribl*"
+        - "!cef_*"
+        - "!index"
+        - "!host"
+        - "!source"
+        - "!sourcetype"
+        - "!message"
+        - "!severity*"
+        - "!facility*"
+        - "!appname"
+        - "*"
+      dstField: _raw
+      cleanFields: true
+    groupId: ttuoWH
+  - id: eval
+    filter: "true"
+    disabled: true
+    conf:
+      add:
+        - name: _raw
+          value: "`${__header}|${_raw}`"
+      remove: []
+      keep: []
+    groupId: ttuoWH
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Final event cleanup below. Set Splunk metadata fields.
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: index
+          value: "index ? index : 'main'"
+        - name: source
+          value: "source ? source : 'cribl'"
+        - name: sourcetype
+          value: "sourcetype ? sourcetype : 'cef:syslog'"
+        - name: host
+          value: "host ? host : 'cribl'"
+      keep:
+        - _*
+        - cribl*
+        - index
+        - source
+        - sourcetype
+        - host
+      remove:
+        - "*"
+        - cef_*
+    description: Cleanup fields and set Splunk metadata fields

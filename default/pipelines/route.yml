@@ -1,0 +1,21 @@
+id: default
+groups: {}
+routes:
+  - id: default
+    name: Process CEF events
+    final: true
+    disabled: false
+    pipeline: cef_processor
+    description: ""
+    clones: []
+    filter: _raw.includes('CEF:')
+    output: default
+  - id: idTnkh
+    name: Blackhole non-CEF events
+    final: true
+    disabled: false
+    pipeline: devnull
+    description: ""
+    clones: []
+    filter: "true"
+    output: default
