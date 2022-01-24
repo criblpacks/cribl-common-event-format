@@ -13,8 +13,9 @@ clientIPAddress=103.6.32.100
 
 ## Installation
 ---
-1. Download the most recent .crbl file from the repo [releases page](https://github.com/criblpacks/cribl-common-event-format/releases).
-1a. Install in LogStream via the github URL for this pack https://github.com/criblpacks/cribl-common-event-format.git
+1. Get the bits.
+   1. Download the most recent .crbl file from the repo [releases page](https://github.com/criblpacks/cribl-common-event-format/releases).
+   2. -or- Install in LogStream via the Github URL for this pack: `https://github.com/criblpacks/cribl-common-event-format.git`
 2. Create a Route with with a filter for your CEF events.
 3. Select the `Common Event Format (CEF)` pack as the pipeline.
 4. Configure the pack `cef_processor` pipeline with the desired output format. K=V, JSON, and CEF-like are pre-configured output options. Enable one of these function groups. **Failure to enable an output configuration will result in functionality similar to the "passthru" pipeline.**
