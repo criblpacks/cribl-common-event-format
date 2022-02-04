@@ -8,7 +8,20 @@ routes:
     pipeline: cef_processor
     description: ""
     clones: []
-    filter: _raw.includes('CEF:')
+    enableOutputExpression: false
+    outputExpression: null
+    filter: _raw.indexOf(' CEF:') > -1
+    output: default
+  - id: LrkMwA
+    name: Process LEEF events
+    final: true
+    disabled: false
+    pipeline: leef_processor
+    description: ""
+    clones: []
+    enableOutputExpression: false
+    outputExpression: null
+    filter: _raw.indexOf(' LEEF:') > -1
     output: default
   - id: idTnkh
     name: Blackhole non-CEF events
@@ -17,5 +30,7 @@ routes:
     pipeline: devnull
     description: ""
     clones: []
+    enableOutputExpression: false
+    outputExpression: null
     filter: "true"
     output: default

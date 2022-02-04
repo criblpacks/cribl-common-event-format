@@ -1,4 +1,5 @@
 output: default
+description: Common Event Format (CEF) Reshaping Pipeline
 groups:
   BVYPDJ:
     name: Field Extractions

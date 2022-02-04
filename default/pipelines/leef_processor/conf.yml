@@ -1,0 +1,141 @@
+output: default
+description: Log Event Extended Format (LEEF) Reshaping Pipeline
+groups:
+  Nxi2NQ:
+    name: LEEF Data Extraction
+    description: Extract headers and message body from the Syslog message and create event
+      fields
+    index: 1
+  FPIzG6:
+    name: Re-serialize as K=V Pairs (No LEEF header)
+    disabled: true
+    index: 2
+  Og9wZN:
+    name: Re-serialize as JSON
+    disabled: true
+    index: 3
+asyncFuncTimeout: 1000
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: |-
+        Log Event Extended Format (LEEF) handling
+
+        Author: Brendan Dalpe (bdalpe@cribl.io)
+  - id: regex_extract
+    filter: "true"
+    disabled: false
+    conf:
+      source: _raw
+      iterations: 100
+      overwrite: false
+      regex: /(?<__header>LEEF:(?<leef_version>[\d\.]+)\|(?<leef_device_vendor>.*?)(?<!\\)\|(?<leef_device_product>.*?)(?<!\\)\|(?<leef_device_version>.*?)(?<!\\)\|(?<leef_event_id>.*?)(?<!\\)\|(?:(?<leef_delimiter_character>(?:\S|x[0-9a-fA-F]+))(?<!\\)\|)?)(?<__raw_message>.*)/
+    description: Extract LEEF header values
+    groupId: Nxi2NQ
+  - id: mask
+    filter: leef_delimiter_character
+    disabled: null
+    conf:
+      rules:
+        - matchRegex: /(.+)/
+          replaceExpr: String.fromCharCode(C.Decode.hex(`0${g1}`))
+      fields:
+        - leef_delimiter_character
+    description: Convert LEEF delimiter character from hex to ASCII
+    groupId: Nxi2NQ
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: K=V field extraction happens here 👇
+    groupId: Nxi2NQ
+  - id: code
+    filter: "true"
+    disabled: null
+    conf:
+      maxNumOfIterations: 5000
+      code: >-
+        // Split raw message based on the delimiter character
+
+        let arr = __e['__raw_message'].split(__e['leef_delimiter_character'] || '\t')
+
+
+        arr.forEach(entry => {
+          // Extract all key value pairs
+          let e = entry.match(/([^=]+?)=(.+)/)
+
+          // Map key=value pairs and place into the event data
+          __e[e[1]] = e[2]
+        })
+    description: Split and Extract K=V Pairs from LEEF message
+    groupId: Nxi2NQ
+  - id: serialize
+    filter: "true"
+    disabled: true
+    conf:
+      type: kvp
+      fields:
+        - "!__*"
+        - "!_*"
+        - "!cribl*"
+        - "!leef_*"
+        - "!index"
+        - "!host"
+        - "!source"
+        - "!sourcetype"
+        - "!message"
+        - "!severity*"
+        - "!facility*"
+        - "!appname"
+        - "*"
+      dstField: _raw
+      cleanFields: true
+    groupId: FPIzG6
+  - id: serialize
+    filter: "true"
+    disabled: true
+    conf:
+      type: json
+      dstField: _raw
+      fields:
+        - "!__*"
+        - "!_*"
+        - "!cribl*"
+        - "!leef_*"
+        - "!index"
+        - "!host"
+        - "!source"
+        - "!sourcetype"
+        - "!message"
+        - "!severity*"
+        - "!facility*"
+        - "!appname"
+        - "*"
+      cleanFields: true
+    groupId: Og9wZN
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: index
+          value: "index ? index : 'main'"
+        - name: source
+          value: "source ? source : 'cribl'"
+        - name: sourcetype
+          value: "sourcetype ? sourcetype : 'leef:syslog'"
+        - name: host
+          value: "host ? host : 'cribl'"
+      keep:
+        - _*
+        - cribl*
+        - index
+        - source
+        - sourcetype
+        - host
+      remove:
+        - "*"
+        - leef_*
+    description: Cleanup fields and set Splunk metadata fields
